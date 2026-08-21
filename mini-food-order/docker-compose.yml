@@ -1,0 +1,89 @@
+services:
+
+  # ==========================
+  # MYSQL DATABASE
+  # ==========================
+  database:
+    image: mysql:8.0
+    container_name: food-mysql
+
+    restart: unless-stopped
+
+    environment:
+      MYSQL_DATABASE: fooddb
+      MYSQL_USER: fooduser
+      MYSQL_PASSWORD: foodpassword
+      MYSQL_ROOT_PASSWORD: rootpassword
+
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+    ports:
+      - "3306:3306"
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-ufooduser",
+          "-pfoodpassword"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+
+  # ==========================
+  # FLASK BACKEND
+  # ==========================
+  backend:
+    build:
+      context: ./backend
+
+    container_name: food-backend
+
+    restart: unless-stopped
+
+    environment:
+      DB_HOST: database
+      DB_PORT: 3306
+      DB_NAME: fooddb
+      DB_USER: fooduser
+      DB_PASSWORD: foodpassword
+
+    depends_on:
+      database:
+        condition: service_healthy
+
+    ports:
+      - "5000:5000"
+
+
+  # ==========================
+  # REACT + NGINX FRONTEND
+  # ==========================
+  frontend:
+    build:
+      context: ./frontend
+
+    container_name: food-frontend
+
+    restart: unless-stopped
+
+    depends_on:
+      - backend
+
+    ports:
+      - "80:80"
+
+
+# ==========================
+# PERSISTENT MYSQL STORAGE
+# ==========================
+volumes:
+  mysql_data:
